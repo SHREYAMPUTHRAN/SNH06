@@ -1,0 +1,49 @@
+from flask import Flask, render_template, request, jsonify
+import linkedin
+from nltk.sentiment import SentimentIntensityAnalyzer
+
+app = Flask(_name_)
+
+# Ensure you have nltk data downloaded
+sia = SentimentIntensityAnalyzer()
+
+def analyze_sentiment(text):
+    sentiment_score = sia.polarity_scores(text)['compound']
+    if sentiment_score >= 0.05:
+        return 'Positive'
+    elif sentiment_score <= -0.05:
+        return 'Negative'
+    else:
+        return 'Neutral'
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/analyze_sentiment', methods=['POST'])
+def analyze_sentiment_route():
+    # Get LinkedIn API credentials and token from the form
+    client_id = request.form['clientId']
+    client_secret = request.form['clientSecret']
+    redirect_uri = request.form['redirectUri']
+    linkedin_token = request.form['accessToken']
+
+    # Authenticate with LinkedIn API
+    authentication = linkedin.LinkedInAuthentication(client_id, client_secret, redirect_uri, permissions=['r_basicprofile'])
+    authentication.authorization_code = linkedin_token
+    access_token = authentication.get_access_token()
+    application = linkedin.LinkedInApplication(token=access_token)
+
+    # Step 1: Collecting Data and Categorize
+    user_data = application.get_profile()
+    user_connections = application.get_connections()
+
+    # Step 2: Sentiment Analysis
+    user_posts = application.get_posts()
+    sentiments = [analyze_sentiment(post['title'] + ' ' + post['summary']) for post in user_posts['values']]
+
+    # Return sentiment analysis results
+    return jsonify({'sentiments': sentiments})
+
+if _name_ == '_main_':
+    app.run(debug=True)
